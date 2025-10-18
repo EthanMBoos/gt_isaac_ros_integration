@@ -163,7 +163,10 @@ RUN python3.11 -m pip install "pybind11[global]"
 
 RUN mkdir -p ${ROS_ROOT}/src && \
     cd ${ROS_ROOT} && \
-    rosinstall_generator --deps --rosdistro ${ROS_DISTRO} rosidl_runtime_c rcutils rcl rmw tf2 tf2_msgs common_interfaces geometry_msgs nav_msgs std_msgs rosgraph_msgs sensor_msgs vision_msgs rclpy ros2topic ros2pkg ros2doctor ros2run ros2node ros_environment ackermann_msgs example_interfaces > ros2.${ROS_DISTRO}.${ROS_PKG}.rosinstall && \
+    rosinstall_generator --deps --rosdistro ${ROS_DISTRO} rosidl_runtime_c rcutils rcl rmw tf2 tf2_msgs common_interfaces geometry_msgs nav_msgs std_msgs rosgraph_msgs sensor_msgs vision_msgs rclpy ros2topic ros2pkg ros2doctor ros2run ros2node ros_environment ackermann_msgs example_interfaces \
+    urdf xacro dynamixel_sdk message_filters tf2_ros turtlebot3_msgs \
+    ros2launch ros2param ros2service ros2action \
+    > ros2.${ROS_DISTRO}.${ROS_PKG}.rosinstall && \
     cat ros2.${ROS_DISTRO}.${ROS_PKG}.rosinstall && \
     vcs import src < ros2.${ROS_DISTRO}.${ROS_PKG}.rosinstall
 
@@ -192,7 +195,7 @@ RUN cp /usr/lib/x86_64-linux-gnu/libtinyxml2.so* /workspace/humble_ws/install/li
 RUN cp /usr/lib/x86_64-linux-gnu/libssl.so* /workspace/humble_ws/install/lib/ || true
 RUN cp /usr/lib/x86_64-linux-gnu/libcrypto.so* /workspace/humble_ws/install/lib/ || true
 
-# Next, build the additional workspace 
+# Next, build the additional workspace
 RUN mkdir -p /workspace/build_ws/src
 
 
@@ -200,7 +203,7 @@ RUN mkdir -p /workspace/build_ws/src
 COPY humble_ws/src /workspace/build_ws/src
 
 # Removing MoveIt packages from the internal ROS Python 3.11 library build as it uses standard interfaces already built above.
-# This is to ensure that the internal build is as minimal as possible. 
+# This is to ensure that the internal build is as minimal as possible.
 # For the user facing MoveIt interface workflow, this package should be built with the rest of the workspace uisng the external ROS installation.
 RUN rm -rf /workspace/build_ws/src/moveit
 
@@ -214,8 +217,26 @@ ENV Python3_EXECUTABLE=/usr/bin/python3.11
 ENV PYTHON_INCLUDE_DIR=/usr/include/python3.11
 ENV PYTHON_LIBRARY=/usr/lib/x86_64-linux-gnu/libpython3.11.so
 
-# Build the workspace with Python 3.11
-RUN /bin/bash -c "source ${ROS_ROOT}/install/setup.sh && cd build_ws && colcon build --cmake-args \
+# Devnote: This Dockerfile intentionally runs two separate `colcon` builds
+# to cache the large, base ROS build (Build 1, from rosinstall_generator)
+# from the smaller, user package build (Build 2, from the COPY command).
+#
+# THE PROBLEM WE'RE SOLVING:
+# - Build 1 installs to: /workspace/${ROS_ROOT}/install
+# - Build 2 (this command) was, by default, installing to: /workspace/build_ws/install
+#
+# The parent `build_ros.sh` script only copies the output from Build 1's
+# directory. This meant all the user packages from Build 2 were being
+# discarded, even though they compiled successfully.
+#
+# THE SOLUTION:
+# We use `--merge-install` and `--install-base` to force this
+# second build (Build 2) to install its packages *into* Build 1's
+# directory, creating a single, unified install workspace that the
+# build script can correctly copy.
+#
+RUN /bin/bash -c "source ${ROS_ROOT}/install/setup.sh && \
+    cd build_ws && colcon build --merge-install --install-base /workspace/${ROS_ROOT}/install --cmake-args \
     '-DPython3_EXECUTABLE=/usr/bin/python3.11' \
     '-DPYTHON_EXECUTABLE=/usr/bin/python3.11' \
     '-DPYTHON_INCLUDE_DIR=/usr/include/python3.11' \

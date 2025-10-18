@@ -1,0 +1,25 @@
+# Start from the official Isaac Sim base image
+FROM nvcr.io/nvidia/isaac-sim:5.0.0
+
+# Install libspdlog1, a required runtime library missing from the base image.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libspdlog1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Shim `python3` to force all calls to use Isaac Sim's internal interpreter.
+# This is critical for ensuring ROS nodes use the correct Python environment.
+RUN echo '#!/bin/bash\nexec /isaac-sim/python.sh "$@"' > /usr/local/bin/python3 && \
+    chmod +x /usr/local/bin/python3
+
+# Add the 'lark' dependency, which is required by `ros2launch`.
+RUN python3 -m pip install lark
+
+# Copy the pre-built ROS 2 workspace into the container.
+COPY ./build_ws/humble/humble_ws /opt/ros2_ws
+
+# Fix hardcoded python paths in the workspace's scripts. This find-and-replace
+# command ensures the scripts use the `python3` shim we created above.
+RUN find /opt/ros2_ws/install -type f -exec sed -i '1s|^#!/usr/bin/python3$|#!/usr/bin/env python3|' {} +
+
+# Auto-source the workspace for new terminal sessions.
+RUN echo "source /opt/ros2_ws/install/setup.bash" >> ~/.bashrc
