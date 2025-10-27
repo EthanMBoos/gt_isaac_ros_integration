@@ -190,10 +190,23 @@ RUN cd ${ROS_ROOT} && colcon build --cmake-args \
     "-DPYTHON_LIBRARY=/usr/lib/x86_64-linux-gnu/libpython3.11.so" \
     --merge-install
 
+# --- ADD THIS NEW BLOCK ---
+# Manually install Python dependencies (like argcomplete)
+# directly into the workspace's 'install' directory.
+RUN python3.11 -m pip install \
+    --target /workspace/jazzy_ws/install/lib/python3.11/site-packages \
+    argcomplete
+# --- END OF NEW BLOCK ---
+
 # Need these to maintain compatibility on non 20.04 systems
 RUN cp /usr/lib/x86_64-linux-gnu/libtinyxml2.so* /workspace/jazzy_ws/install/lib/ || true
 RUN cp /usr/lib/x86_64-linux-gnu/libssl.so* /workspace/jazzy_ws/install/lib/ || true
 RUN cp /usr/lib/x86_64-linux-gnu/libcrypto.so* /workspace/jazzy_ws/install/lib/ || true
+# ADD THIS LINE: Copy the LTTng tracing library required by rclpy
+RUN cp /usr/lib/x86_64-linux-gnu/liblttng-ust.so* /workspace/jazzy_ws/install/lib/ || true
+RUN cp /usr/lib/x86_64-linux-gnu/libnuma.so* /workspace/jazzy_ws/install/lib/ || true
+RUN cp /usr/lib/x86_64-linux-gnu/liblttng-ust-common.so* /workspace/jazzy_ws/install/lib/ || true
+RUN cp /usr/lib/x86_64-linux-gnu/liblttng-ust-tracepoint.so* /workspace/jazzy_ws/install/lib/ || true
 
 # Next, build the additional workspace
 RUN mkdir -p /workspace/build_ws/src
