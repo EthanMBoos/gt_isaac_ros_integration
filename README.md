@@ -1,4 +1,4 @@
-# GT Sim2Real Robotics VIP: Nvidia Isaac Sim & ROS2 Integration
+# Nvidia Isaac Sim & ROS2 Integration Example Repo
 
 `gt_isaac_ros_integration` provides a unified development environment for robotics simulation. Its primary function is to populate the NVIDIA Isaac Sim environment with a library of pre-configured robot assets and scenes, along with the toolchain to build the ROS2 nodes that interact with them.
 
